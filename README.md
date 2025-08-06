@@ -19,7 +19,7 @@ CapsuleOS is a modular productivity application designed for efficient personal 
 
 1. **Clone and install**
    ```bash
-   git clone https://github.com/yourusername/capsuleos.git
+   git clone https://github.com/num1hub/capsuleos.git
    cd capsuleos
    npm install
    ```
@@ -112,6 +112,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/capsuleos/issues)
-- **Documentation**: See `docs/` folder
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/capsuleos/discussions)
+- **Issues**: [GitHub Issues](https://github.com/num1hub/capsuleos/issues)
+- **Documentation**: See source code comments
+- **Discussions**: [GitHub Discussions](https://github.com/num1hub/capsuleos/discussions)

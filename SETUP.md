@@ -23,8 +23,8 @@ Built with Node.js + Express, file-based storage, dark theme UI."
 # Set main branch
 git branch -M main
 
-# Add remote (replace with your repository URL)
-git remote add origin https://github.com/yourusername/capsuleos.git
+# Add remote
+git remote add origin https://github.com/num1hub/capsuleos.git
 
 # Push to GitHub
 git push -u origin main

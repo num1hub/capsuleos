@@ -10,7 +10,7 @@ Thank you for your interest in contributing to CapsuleOS!
 
 2. **Setup**
    ```bash
-   git clone https://github.com/yourusername/capsuleos.git
+   git clone https://github.com/num1hub/capsuleos.git
    cd capsuleos
    npm install
    npm start
