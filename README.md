@@ -10,10 +10,11 @@ CapsuleOS is a modular productivity application designed for efficient personal 
 
 ## Features
 
-- **📝 Notes** - Markdown-based note-taking with real-time editing
-- **🧩 Capsules** - Structured JSON objects for flexible data storage
-- **📅 Planner** - Daily task management with due dates and completion tracking
-- **✅ Tracker** - Habit formation and daily logging system
+- **📝 Notes** – Markdown-based note-taking with real-time editing and instant filtering
+- **🧩 Capsules** – Structured JSON objects with tag and title search
+- **📅 Planner** – Daily task management with priorities and sorted scheduling
+- **✅ Tracker** – Habit formation with inline editing and completion logging
+- **⌨️ Shortcuts** – Global keyboard shortcuts for module switching and quick creation
 
 ## Quick Start
 
@@ -118,4 +119,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Upgrading
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes. Upgrades are data-compatible across versions; backup your `data/` folder and replace application files to move from 0.0.2 to 0.0.3.
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Upgrades are data-compatible across versions; backup your `data/` folder and replace application files to move from 0.0.3 to 0.0.4.

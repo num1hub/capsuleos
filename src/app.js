@@ -90,6 +90,7 @@ class NotesModule {
         this.undoStack = [];
         this.redoStack = [];
         this.autoSaveTimer = null;
+        this.filterQuery = '';
     }
 
     async load() {
@@ -116,6 +117,7 @@ class NotesModule {
             }
 
             this.render();
+            this.setupFilter();
         } catch (error) {
             console.error('Failed to load notes:', error);
             this.renderError('Failed to load notes');
@@ -135,7 +137,11 @@ class NotesModule {
 
     render() {
         const container = document.getElementById('notes-content');
-        
+        const query = this.filterQuery.toLowerCase();
+        const filtered = this.notes.filter(n =>
+            n.title.toLowerCase().includes(query) || n.content.toLowerCase().includes(query)
+        );
+
         if (this.notes.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
@@ -146,7 +152,16 @@ class NotesModule {
             return;
         }
 
-        const notesHTML = this.notes.map(note => `
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>No matching notes</h3>
+                </div>
+            `;
+            return;
+        }
+
+        const notesHTML = filtered.map(note => `
             <div class="item-card" onclick="notesModule.editNote('${note.id}')">
                 <div class="item-title">${note.title}</div>
                 <div class="item-preview">${note.preview}</div>
@@ -163,6 +178,17 @@ class NotesModule {
     renderError(message) {
         const container = document.getElementById('notes-content');
         container.innerHTML = `<div class="error">${message}</div>`;
+    }
+
+    setupFilter() {
+        const input = document.getElementById('note-filter');
+        if (input) {
+            input.value = this.filterQuery;
+            input.oninput = (e) => {
+                this.filterQuery = e.target.value;
+                this.render();
+            };
+        }
     }
 
     showCreateModal() {
@@ -243,6 +269,10 @@ class NotesModule {
     }
 
     async autoSave() {
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
+            this.autoSaveTimer = null;
+        }
         const title = document.getElementById('note-title').value.trim();
         const content = document.getElementById('note-content').value;
         if (!title) return;
@@ -301,6 +331,8 @@ class CapsulesModule {
         this.undoStack = [];
         this.redoStack = [];
         this.autoSaveTimer = null;
+        this.filterQuery = '';
+        this.newCapsuleId = null;
     }
 
     async load() {
@@ -319,6 +351,7 @@ class CapsulesModule {
             }
 
             this.render();
+            this.setupFilter();
         } catch (error) {
             console.error('Failed to load capsules:', error);
             this.renderError('Failed to load capsules');
@@ -328,6 +361,11 @@ class CapsulesModule {
     render() {
         const container = document.getElementById('capsules-content');
         
+        const query = this.filterQuery.toLowerCase();
+        const filtered = this.capsules.filter(c =>
+            c.title.toLowerCase().includes(query) || (c.tags || []).some(t => t.toLowerCase().includes(query))
+        );
+
         if (this.capsules.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
@@ -338,7 +376,16 @@ class CapsulesModule {
             return;
         }
 
-        const capsulesHTML = this.capsules.map(capsule => `
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>No matching capsules</h3>
+                </div>
+            `;
+            return;
+        }
+
+        const capsulesHTML = filtered.map(capsule => `
             <div class="item-card" onclick="capsulesModule.editCapsule('${capsule.id}')">
                 <div class="item-title">${capsule.title}</div>
                 <div class="item-preview">${(capsule.payload || '').substring(0, 100)}${(capsule.payload || '').length > 100 ? '...' : ''}</div>
@@ -357,10 +404,22 @@ class CapsulesModule {
         container.innerHTML = `<div class="error">${message}</div>`;
     }
 
+    setupFilter() {
+        const input = document.getElementById('capsule-filter');
+        if (input) {
+            input.value = this.filterQuery;
+            input.oninput = (e) => {
+                this.filterQuery = e.target.value;
+                this.render();
+            };
+        }
+    }
+
     showCreateModal() {
         this.currentCapsule = null;
         this.isEditing = false;
-        
+        this.newCapsuleId = app.generateId();
+
         document.getElementById('capsule-modal-title').textContent = 'Create Capsule';
         document.getElementById('capsule-title').value = '';
         document.getElementById('capsule-tags').value = '';
@@ -388,6 +447,7 @@ class CapsulesModule {
         document.getElementById('capsule-modal').classList.remove('active');
         this.currentCapsule = null;
         this.isEditing = false;
+        this.newCapsuleId = null;
         if (this.autoSaveTimer) {
             clearTimeout(this.autoSaveTimer);
             this.autoSaveTimer = null;
@@ -407,14 +467,16 @@ class CapsulesModule {
         }
 
         const tags = tagsText ? tagsText.split(',').map(tag => tag.trim()) : [];
+        const id = this.currentCapsule ? this.currentCapsule.id : this.newCapsuleId;
         const capsule = {
-            id: this.currentCapsule ? this.currentCapsule.id : Date.now().toString(),
+            id,
             title,
             tags,
-            payload
+            payload,
+            lastModified: new Date().toISOString()
         };
 
-        const filename = `${capsule.id}.json`;
+        const filename = `${id}.json`;
 
         try {
             await APIHelper.post(`/api/file/capsules/${filename}`, { content: JSON.stringify(capsule, null, 2) });
@@ -441,19 +503,25 @@ class CapsulesModule {
     }
 
     async autoSave() {
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
+            this.autoSaveTimer = null;
+        }
         const title = document.getElementById('capsule-title').value.trim();
         const tags = document.getElementById('capsule-tags').value.trim().split(',').map(t => t.trim()).filter(Boolean);
         const payload = document.getElementById('capsule-payload').value;
         if (!title) return;
+        const id = this.currentCapsule ? this.currentCapsule.id : this.newCapsuleId;
         const capsule = {
-            id: title.replace(/\s+/g, '_') + '.json',
+            id,
             title,
             tags,
             payload,
             lastModified: new Date().toISOString()
         };
         try {
-            await APIHelper.post(`/api/file/capsules/${capsule.id}`, { content: JSON.stringify(capsule, null, 2) });
+            await APIHelper.post(`/api/file/capsules/${id}.json`, { content: JSON.stringify(capsule, null, 2) });
+            if (!this.isEditing) this.currentCapsule = capsule;
         } catch (error) {
             console.error('Auto-save capsule failed:', error);
         }
@@ -540,12 +608,19 @@ class PlannerModule {
             return;
         }
 
-        const tasksHTML = this.tasks.map(task => `
+        const sorted = [...this.tasks].sort((a, b) => {
+            if (a.done !== b.done) return a.done ? 1 : -1;
+            const dueA = a.due ? new Date(a.due).getTime() : Infinity;
+            const dueB = b.due ? new Date(b.due).getTime() : Infinity;
+            return dueA - dueB;
+        });
+
+        const tasksHTML = sorted.map(task => `
             <div class="item-card task-item ${task.done ? 'completed' : ''}">
-                <input type="checkbox" ${task.done ? 'checked' : ''} onchange="plannerModule.toggleTask('${task.id}')" style="margin-right: 8px;">
+                <input type="checkbox" ${task.done ? 'checked' : ''} onchange="plannerModule.toggleTask('${task.id}')" style="margin-right: 8px;" onclick="event.stopPropagation();">
                 <div style="flex: 1;" onclick="plannerModule.editTask('${task.id}')">
                     <div class="item-title">${task.title}</div>
-                    <div class="item-preview">Due: ${task.due ? new Date(task.due).toLocaleString() : 'No due date'}</div>
+                    <div class="item-preview">Due: ${task.due ? new Date(task.due).toLocaleString() : 'No due date'} · Priority: ${task.priority || 'medium'}</div>
                 </div>
                 <div class="item-actions">
                     <button class="btn btn-danger btn-small" onclick="plannerModule.deleteTask('${task.id}')" style="padding: 4px 8px; font-size: 12px;">Delete</button>
@@ -559,10 +634,11 @@ class PlannerModule {
     showCreateModal() {
         this.currentTask = null;
         this.isEditing = false;
-        
+
         document.getElementById('task-modal-title').textContent = 'Create Task';
         document.getElementById('task-title').value = '';
         document.getElementById('task-due').value = '';
+        document.getElementById('task-priority').value = 'medium';
         document.getElementById('task-modal').classList.add('active');
     }
 
@@ -576,6 +652,7 @@ class PlannerModule {
         document.getElementById('task-modal-title').textContent = 'Edit Task';
         document.getElementById('task-title').value = task.title;
         document.getElementById('task-due').value = task.due || '';
+        document.getElementById('task-priority').value = task.priority || 'medium';
         document.getElementById('task-modal').classList.add('active');
     }
 
@@ -590,6 +667,7 @@ class PlannerModule {
         
         const title = document.getElementById('task-title').value.trim();
         const due = document.getElementById('task-due').value;
+        const priority = document.getElementById('task-priority').value;
 
         if (!title) {
             app.showError('Please enter a task title');
@@ -599,8 +677,9 @@ class PlannerModule {
         const task = {
             id: this.currentTask ? this.currentTask.id : Date.now().toString(),
             title,
-            due: due || new Date().toISOString(),
-            done: this.currentTask ? this.currentTask.done : false
+            due: due || '',
+            done: this.currentTask ? this.currentTask.done : false,
+            priority
         };
 
         if (this.isEditing) {
@@ -653,6 +732,8 @@ class TrackerModule {
         this.habits = [];
         this.todayLog = {};
         this.today = new Date().toISOString().split('T')[0];
+        this.currentHabit = null;
+        this.isEditing = false;
     }
 
     async load() {
@@ -691,17 +772,18 @@ class TrackerModule {
         }
 
         const habitsHTML = this.habits.map(habit => `
-            <div class="item-card habit-item">
+            <div class="item-card habit-item" onclick="trackerModule.editHabit('${habit.id}')">
                 <div style="flex: 1;">
                     <div class="item-title">${habit.name}</div>
                     <div class="item-preview">${habit.description || 'No description'}</div>
                 </div>
                 <div class="habit-controls">
-                    <input type="checkbox" 
-                           ${this.todayLog.completions && this.todayLog.completions[habit.id] ? 'checked' : ''} 
+                    <input type="checkbox"
+                           ${this.todayLog.completions && this.todayLog.completions[habit.id] ? 'checked' : ''}
                            onchange="trackerModule.toggleHabit('${habit.id}', this.checked)"
+                           onclick="event.stopPropagation();"
                            style="margin-right: 8px;">
-                    <button class="btn btn-danger btn-small" onclick="trackerModule.deleteHabit('${habit.id}')" style="padding: 4px 8px; font-size: 12px;">Delete</button>
+                    <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); trackerModule.deleteHabit('${habit.id}')" style="padding: 4px 8px; font-size: 12px;">Delete</button>
                 </div>
             </div>
         `).join('');
@@ -721,6 +803,8 @@ class TrackerModule {
     }
 
     showCreateModal() {
+        this.currentHabit = null;
+        this.isEditing = false;
         document.getElementById('habit-modal-title').textContent = 'Create Habit';
         document.getElementById('habit-name').value = '';
         document.getElementById('habit-description').value = '';
@@ -729,6 +813,19 @@ class TrackerModule {
 
     hideModal() {
         document.getElementById('habit-modal').classList.remove('active');
+        this.currentHabit = null;
+        this.isEditing = false;
+    }
+
+    editHabit(habitId) {
+        const habit = this.habits.find(h => h.id === habitId);
+        if (!habit) return;
+        this.currentHabit = habit;
+        this.isEditing = true;
+        document.getElementById('habit-modal-title').textContent = 'Edit Habit';
+        document.getElementById('habit-name').value = habit.name;
+        document.getElementById('habit-description').value = habit.description || '';
+        document.getElementById('habit-modal').classList.add('active');
     }
 
     async saveHabit(event) {
@@ -743,13 +840,18 @@ class TrackerModule {
         }
 
         const habit = {
-            id: Date.now().toString(),
+            id: this.currentHabit ? this.currentHabit.id : Date.now().toString(),
             name,
             description,
-            created: new Date().toISOString()
+            created: this.currentHabit ? this.currentHabit.created : new Date().toISOString()
         };
 
-        this.habits.push(habit);
+        if (this.isEditing) {
+            const index = this.habits.findIndex(h => h.id === this.currentHabit.id);
+            if (index !== -1) this.habits[index] = habit;
+        } else {
+            this.habits.push(habit);
+        }
 
         try {
             const habitsData = { habits: this.habits };
@@ -881,21 +983,36 @@ document.getElementById('search-input')?.addEventListener('input', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key === 'n') {
-        e.preventDefault();
-        notesModule.showCreateModal();
+    const key = e.key.toLowerCase();
+    if (e.ctrlKey && !e.shiftKey) {
+        if (key === '1') { e.preventDefault(); app.switchModule('notes'); }
+        if (key === '2') { e.preventDefault(); app.switchModule('capsules'); }
+        if (key === '3') { e.preventDefault(); app.switchModule('planner'); }
+        if (key === '4') { e.preventDefault(); app.switchModule('tracker'); }
+        if (key === 'n') { e.preventDefault(); app.switchModule('notes'); notesModule.showCreateModal(); }
+        if (key === 's') {
+            e.preventDefault();
+            if (document.getElementById('note-modal').classList.contains('active')) { clearTimeout(notesModule.autoSaveTimer); notesModule.autoSave(); }
+            if (document.getElementById('capsule-modal').classList.contains('active')) { clearTimeout(capsulesModule.autoSaveTimer); capsulesModule.autoSave(); }
+        }
     }
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        showSearchModal();
+    if (e.ctrlKey && e.shiftKey) {
+        if (key === 'c') { e.preventDefault(); app.switchModule('capsules'); capsulesModule.showCreateModal(); }
+        if (key === 'p') {
+            e.preventDefault();
+            app.switchModule('planner');
+            plannerModule.currentDate = new Date().toISOString().split('T')[0];
+            plannerModule.loadDate().then(() => plannerModule.showCreateModal());
+        }
+        if (key === 'h') { e.preventDefault(); app.switchModule('tracker'); trackerModule.showCreateModal(); }
+        if (key === 'f') { e.preventDefault(); showSearchModal(); }
     }
-    if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        if (document.getElementById('note-modal').classList.contains('active')) notesModule.autoSave();
-        if (document.getElementById('capsule-modal').classList.contains('active')) capsulesModule.autoSave();
-    }
-    if (e.key === 'Escape') {
+    if (key === 'escape') {
         hideSearchModal();
+        notesModule.hideModal();
+        capsulesModule.hideModal();
+        plannerModule.hideModal();
+        trackerModule.hideModal();
     }
 });
 

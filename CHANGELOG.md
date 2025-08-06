@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.4 - 2025-08-08
+### Added
+- Filter inputs for notes and capsules with real-time search.
+- Planner task priorities with sorting and display.
+- Habit editing and deletion confirmations.
+- Keyboard shortcuts for module switching and quick creation.
+### Changed
+- Stabilized capsule autosave with persistent IDs and timestamps.
+- Improved note and capsule autosave with manual Ctrl+S flush.
+- Updated UI styles and version strings to 0.0.4.
+
 ## 0.0.3 - 2025-08-06
 ### Changed
 - Debounced note and capsule auto-save to save after 2 seconds of inactivity.

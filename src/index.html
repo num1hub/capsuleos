@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CapsuleOS v0.0.3</title>
+    <title>CapsuleOS v0.0.4</title>
     <style>
         :root {
             --bg-primary: #0f0f0f;
@@ -124,6 +124,16 @@
         .module-title {
             font-size: 24px;
             font-weight: 600;
+        }
+
+        .module-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .module-controls .form-input {
+            width: 200px;
         }
 
         .btn {
@@ -338,7 +348,7 @@
         <nav class="sidebar">
             <div class="logo">
                 <h1>CapsuleOS</h1>
-                <p>v0.0.3</p>
+                <p>v0.0.4</p>
             </div>
             <div class="nav-menu">
                 <button class="nav-item active" data-module="notes">📝 Notes</button>
@@ -353,7 +363,10 @@
             <div id="notes" class="module active">
                 <div class="module-header">
                     <h2 class="module-title">Notes</h2>
-                    <button class="btn btn-primary" onclick="notesModule.showCreateModal()">New Note</button>
+                    <div class="module-controls">
+                        <input type="text" id="note-filter" class="form-input" placeholder="Filter notes...">
+                        <button class="btn btn-primary" onclick="notesModule.showCreateModal()">New Note</button>
+                    </div>
                 </div>
                 <div id="notes-content">
                     <div class="loading">Loading notes...</div>
@@ -364,7 +377,10 @@
             <div id="capsules" class="module">
                 <div class="module-header">
                     <h2 class="module-title">Capsules</h2>
-                    <button class="btn btn-primary" onclick="capsulesModule.showCreateModal()">New Capsule</button>
+                    <div class="module-controls">
+                        <input type="text" id="capsule-filter" class="form-input" placeholder="Filter capsules...">
+                        <button class="btn btn-primary" onclick="capsulesModule.showCreateModal()">New Capsule</button>
+                    </div>
                 </div>
                 <div id="capsules-content">
                     <div class="loading">Loading capsules...</div>
