@@ -16,6 +16,10 @@ CapsuleOS is a modular productivity application designed for efficient personal 
 - **✅ Tracker** – Habit formation with inline editing and completion logging
 - **⌨️ Shortcuts** – Global keyboard shortcuts for module switching and quick creation
 
+## Search Index
+
+CapsuleOS includes a local Fuse.js-powered search index that watches your data folder and provides fuzzy cross-module queries in under 100 ms. Archived items and versioned files are excluded by default but can be included via query options.
+
 ## Quick Start
 
 1. **Clone and install**
@@ -119,4 +123,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Upgrading
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes. Upgrades are data-compatible across versions; backup your `data/` folder and replace application files to move from 0.0.3 to 0.0.4.
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Upgrades are data-compatible across versions; backup your `data/` folder and replace application files to move from 0.0.4 to 0.0.5.

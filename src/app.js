@@ -944,7 +944,7 @@ function hideSearchModal() {
 
 async function performSearch(query) {
     try {
-        const data = await APIHelper.get(`/api/search?q=${encodeURIComponent(query)}`);
+        const data = await searchIndex.query(query);
         const resultsEl = document.getElementById('search-results');
         const resultsHtml = data.results.map(r => `<li><a href="#">${r.path}</a></li>`).join('');
         resultsEl.innerHTML = DOMPurify.sanitize(resultsHtml);
