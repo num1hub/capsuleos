@@ -40,7 +40,7 @@ async function buildWindows() {
         });
         
         console.log('✓ Windows build completed successfully!');
-        console.log('Installer saved to: dist/CapsuleOS-0.0.4-Windows-Setup.exe');
+        console.log('Installer saved to: dist/CapsuleOS-0.0.5-Windows-Setup.exe');
         
     } catch (error) {
         console.error('Build failed:', error);

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.5 - 2025-08-09
+### Added
+- In-memory Fuse.js search index with file system watching and query API.
+- Updated UI and API to use the new search subsystem.
+
 ## 0.0.4 - 2025-08-08
 ### Added
 - Filter inputs for notes and capsules with real-time search.

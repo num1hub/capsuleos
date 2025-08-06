@@ -4,7 +4,7 @@ const fs = require('fs').promises;
 const archiver = require('archiver');
 const AdmZip = require('adm-zip');
 const multer = require('multer');
-const Fuse = require('fuse.js');
+const { SearchIndexer } = require('./src/search/indexer');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -30,6 +30,7 @@ app.use((req, res, next) => {
 
 // Data directory setup
 const dataPath = path.join(__dirname, 'data');
+const searchIndexer = new SearchIndexer(dataPath);
 
 async function initializeDataFolders() {
     const folders = ['notes', 'capsules', 'planner', 'tracker', 'tracker/logs'];
@@ -54,41 +55,14 @@ async function initializeDataFolders() {
 }
 
 // API Routes
-async function getAllFiles(dir) {
-    const dirents = await fs.readdir(dir, { withFileTypes: true });
-    const files = await Promise.all(dirents.map((dirent) => {
-        const res = path.resolve(dir, dirent.name);
-        return dirent.isDirectory() ? getAllFiles(res) : res;
-    }));
-    return Array.prototype.concat(...files);
+function searchData(query) {
+    return searchIndexer.query(query).map(item => ({ path: item.itemId }));
 }
 
-async function searchData(query) {
-    const folders = ['notes', 'capsules', 'planner', 'tracker'];
-    const documents = [];
-    for (const folder of folders) {
-        const folderPath = path.join(dataPath, folder);
-        try {
-            const files = await getAllFiles(folderPath);
-            for (const file of files) {
-                try {
-                    const content = await fs.readFile(file, 'utf8');
-                    documents.push({
-                        path: path.join(folder, path.relative(folderPath, file)),
-                        content
-                    });
-                } catch { /* ignore */ }
-            }
-        } catch { /* ignore */ }
-    }
-    const fuse = new Fuse(documents, { keys: ['path', 'content'], includeScore: true, threshold: 0.4 });
-    return fuse.search(query).map(result => ({ path: result.item.path, score: result.score }));
-}
-
-app.get('/api/search', async (req, res) => {
+app.get('/api/search', (req, res) => {
     try {
         const q = req.query.q || '';
-        const results = q ? await searchData(q) : [];
+        const results = q ? searchData(q) : [];
         res.json({ results });
     } catch (error) {
         console.error('Search error:', error);
@@ -143,6 +117,7 @@ app.post('/api/file/:folder/:filename', async (req, res) => {
         await fs.mkdir(dir, { recursive: true });
         
         await fs.writeFile(fullPath, content, 'utf8');
+        if (searchIndexer) searchIndexer.addFile(fullPath);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: `Failed to write file: ${error.message}` });
@@ -161,6 +136,7 @@ app.post('/api/file/:folder/:subfolder/:filename', async (req, res) => {
         await fs.mkdir(dir, { recursive: true });
         
         await fs.writeFile(fullPath, content, 'utf8');
+        if (searchIndexer) searchIndexer.addFile(fullPath);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: `Failed to write file: ${error.message}` });
@@ -173,6 +149,7 @@ app.delete('/api/file/:folder/:filename', async (req, res) => {
         const filePath = `${folder}/${filename}`;
         const fullPath = path.join(dataPath, filePath);
         await fs.unlink(fullPath);
+        if (searchIndexer) searchIndexer.removeFile(fullPath);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: `Failed to delete file: ${error.message}` });
@@ -185,6 +162,7 @@ app.delete('/api/file/:folder/:subfolder/:filename', async (req, res) => {
         const filePath = `${folder}/${subfolder}/${filename}`;
         const fullPath = path.join(dataPath, filePath);
         await fs.unlink(fullPath);
+        if (searchIndexer) searchIndexer.removeFile(fullPath);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: `Failed to delete file: ${error.message}` });
@@ -263,9 +241,10 @@ app.use((req, res) => {
 async function startServer() {
     try {
         await initializeDataFolders();
-        
+        searchIndexer.buildIndex();
+
         const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log(`CapsuleOS v0.0.4 Server running on http://0.0.0.0:${PORT}`);
+            console.log(`CapsuleOS v0.0.5 Server running on http://0.0.0.0:${PORT}`);
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
         });
 
