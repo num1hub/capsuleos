@@ -55,14 +55,17 @@ async function initializeDataFolders() {
 }
 
 // API Routes
-function searchData(query) {
-    return searchIndexer.query(query).map(item => ({ path: item.itemId }));
+function searchData(query, options = {}) {
+    return searchIndexer
+        .query(query, options)
+        .map(item => ({ path: item.itemId }));
 }
 
 app.get('/api/search', (req, res) => {
     try {
         const q = req.query.q || '';
-        const results = q ? searchData(q) : [];
+        const includeArchived = req.query.includeArchived === '1' || req.query.includeArchived === 'true';
+        const results = q ? searchData(q, { includeArchived }) : [];
         res.json({ results });
     } catch (error) {
         console.error('Search error:', error);
@@ -244,7 +247,7 @@ async function startServer() {
         searchIndexer.buildIndex();
 
         const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log(`CapsuleOS v0.0.5 Server running on http://0.0.0.0:${PORT}`);
+            console.log(`CapsuleOS v0.0.6 Server running on http://0.0.0.0:${PORT}`);
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
         });
 
