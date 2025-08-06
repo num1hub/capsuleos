@@ -265,7 +265,7 @@ async function startServer() {
         await initializeDataFolders();
         
         const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log(`CapsuleOS v0.0.3 Server running on http://0.0.0.0:${PORT}`);
+            console.log(`CapsuleOS v0.0.4 Server running on http://0.0.0.0:${PORT}`);
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
         });
 
