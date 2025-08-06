@@ -89,7 +89,7 @@ class NotesModule {
         this.isEditing = false;
         this.undoStack = [];
         this.redoStack = [];
-        this.autoSaveInterval = null;
+        this.autoSaveTimer = null;
     }
 
     async load() {
@@ -194,6 +194,10 @@ class NotesModule {
         document.getElementById('note-modal').classList.remove('active');
         this.currentNote = null;
         this.isEditing = false;
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
+            this.autoSaveTimer = null;
+        }
     }
 
     async saveNote(event) {
@@ -254,16 +258,20 @@ class NotesModule {
         const contentEl = document.getElementById('note-content');
         this.undoStack = [contentEl.value];
         this.redoStack = [];
+        const scheduleAutoSave = () => {
+            if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+            this.autoSaveTimer = setTimeout(() => this.autoSave(), 2000);
+        };
         contentEl.oninput = () => {
             this.undoStack.push(contentEl.value);
             if (this.undoStack.length > 1000) this.undoStack.shift();
+            scheduleAutoSave();
         };
         contentEl.onkeydown = (e) => {
             if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this.undo(); }
             if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this.redo(); }
+            scheduleAutoSave();
         };
-        if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
-        this.autoSaveInterval = setInterval(() => this.autoSave(), 5000);
     }
 
     undo() {
@@ -292,7 +300,7 @@ class CapsulesModule {
         this.isEditing = false;
         this.undoStack = [];
         this.redoStack = [];
-        this.autoSaveInterval = null;
+        this.autoSaveTimer = null;
     }
 
     async load() {
@@ -380,6 +388,10 @@ class CapsulesModule {
         document.getElementById('capsule-modal').classList.remove('active');
         this.currentCapsule = null;
         this.isEditing = false;
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
+            this.autoSaveTimer = null;
+        }
     }
 
     async saveCapsule(event) {
@@ -451,16 +463,20 @@ class CapsulesModule {
         const contentEl = document.getElementById('capsule-payload');
         this.undoStack = [contentEl.value];
         this.redoStack = [];
+        const scheduleAutoSave = () => {
+            if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+            this.autoSaveTimer = setTimeout(() => this.autoSave(), 2000);
+        };
         contentEl.oninput = () => {
             this.undoStack.push(contentEl.value);
             if (this.undoStack.length > 1000) this.undoStack.shift();
+            scheduleAutoSave();
         };
         contentEl.onkeydown = (e) => {
             if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this.undo(); }
             if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this.redo(); }
+            scheduleAutoSave();
         };
-        if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
-        this.autoSaveInterval = setInterval(() => this.autoSave(), 5000);
     }
 
     undo() {
@@ -828,7 +844,14 @@ async function performSearch(query) {
     try {
         const data = await APIHelper.get(`/api/search?q=${encodeURIComponent(query)}`);
         const resultsEl = document.getElementById('search-results');
-        resultsEl.innerHTML = data.results.map(r => `<li><a href="#" onclick="openSearchResult('${r.path}')">${r.path}</a></li>`).join('');
+        const resultsHtml = data.results.map(r => `<li><a href="#">${r.path}</a></li>`).join('');
+        resultsEl.innerHTML = DOMPurify.sanitize(resultsHtml);
+        Array.from(resultsEl.querySelectorAll('a')).forEach((a, idx) => {
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                openSearchResult(data.results[idx].path);
+            });
+        });
     } catch (err) {
         console.error('Search failed', err);
     }

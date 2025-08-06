@@ -115,3 +115,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Issues**: [GitHub Issues](https://github.com/num1hub/capsuleos/issues)
 - **Documentation**: See source code comments
 - **Discussions**: [GitHub Discussions](https://github.com/num1hub/capsuleos/discussions)
+
+## Upgrading
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Upgrades are data-compatible across versions; backup your `data/` folder and replace application files to move from 0.0.2 to 0.0.3.
