@@ -1,13 +1,14 @@
 {
   "name": "capsuleos",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Local-first cognitive operating system for personal productivity",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "node index.js",
     "build": "node build.js",
-    "build-win": "node build.js"
+    "build-win": "node build.js",
+    "test": "jest"
   },
   "keywords": [
     "productivity",
@@ -29,10 +30,18 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "adm-zip": "^0.5.16",
+    "archiver": "^7.0.1",
+    "core-util-is": "^1.0.3",
+    "express": "^4.18.2",
+    "fuse.js": "^7.1.0",
+    "multer": "^2.0.2"
   },
   "devDependencies": {
     "electron": "^37.2.5",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "jest": "^30.0.5",
+    "spectron": "^19.0.0",
+    "supertest": "^7.1.4"
   }
 }
