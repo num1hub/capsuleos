@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CapsuleOS v0.0.1</title>
+    <title>CapsuleOS v0.0.2</title>
     <style>
         :root {
             --bg-primary: #0f0f0f;
@@ -338,7 +338,7 @@
         <nav class="sidebar">
             <div class="logo">
                 <h1>CapsuleOS</h1>
-                <p>v0.0.1</p>
+                <p>v0.0.2</p>
             </div>
             <div class="nav-menu">
                 <button class="nav-item active" data-module="notes">📝 Notes</button>
@@ -488,6 +488,13 @@
                     <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="search-modal" class="modal">
+        <div class="modal-content">
+            <input type="text" id="search-input" class="form-input" placeholder="Search..." />
+            <ul id="search-results" style="margin-top:10px; list-style:none; padding:0;"></ul>
         </div>
     </div>
 

@@ -87,6 +87,9 @@ class NotesModule {
         this.notes = [];
         this.currentNote = null;
         this.isEditing = false;
+        this.undoStack = [];
+        this.redoStack = [];
+        this.autoSaveInterval = null;
     }
 
     async load() {
@@ -170,6 +173,7 @@ class NotesModule {
         document.getElementById('note-title').value = '';
         document.getElementById('note-content').value = '';
         document.getElementById('note-modal').classList.add('active');
+        this.setupEditor();
     }
 
     async editNote(noteId) {
@@ -183,6 +187,7 @@ class NotesModule {
         document.getElementById('note-title').value = note.title;
         document.getElementById('note-content').value = note.content;
         document.getElementById('note-modal').classList.add('active');
+        this.setupEditor();
     }
 
     hideModal() {
@@ -232,6 +237,51 @@ class NotesModule {
             app.showError('Failed to delete note');
         }
     }
+
+    async autoSave() {
+        const title = document.getElementById('note-title').value.trim();
+        const content = document.getElementById('note-content').value;
+        if (!title) return;
+        try {
+            const filename = `${title}.md`;
+            await APIHelper.post(`/api/file/notes/${filename}`, { content });
+        } catch (error) {
+            console.error('Auto-save failed:', error);
+        }
+    }
+
+    setupEditor() {
+        const contentEl = document.getElementById('note-content');
+        this.undoStack = [contentEl.value];
+        this.redoStack = [];
+        contentEl.oninput = () => {
+            this.undoStack.push(contentEl.value);
+            if (this.undoStack.length > 1000) this.undoStack.shift();
+        };
+        contentEl.onkeydown = (e) => {
+            if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this.undo(); }
+            if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this.redo(); }
+        };
+        if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
+        this.autoSaveInterval = setInterval(() => this.autoSave(), 5000);
+    }
+
+    undo() {
+        if (this.undoStack.length > 1) {
+            const current = this.undoStack.pop();
+            this.redoStack.push(current);
+            const prev = this.undoStack[this.undoStack.length - 1];
+            document.getElementById('note-content').value = prev;
+        }
+    }
+
+    redo() {
+        if (this.redoStack.length > 0) {
+            const value = this.redoStack.pop();
+            document.getElementById('note-content').value = value;
+            this.undoStack.push(value);
+        }
+    }
 }
 
 // Capsules Module
@@ -240,6 +290,9 @@ class CapsulesModule {
         this.capsules = [];
         this.currentCapsule = null;
         this.isEditing = false;
+        this.undoStack = [];
+        this.redoStack = [];
+        this.autoSaveInterval = null;
     }
 
     async load() {
@@ -305,6 +358,7 @@ class CapsulesModule {
         document.getElementById('capsule-tags').value = '';
         document.getElementById('capsule-payload').value = '';
         document.getElementById('capsule-modal').classList.add('active');
+        this.setupEditor();
     }
 
     async editCapsule(capsuleId) {
@@ -319,6 +373,7 @@ class CapsulesModule {
         document.getElementById('capsule-tags').value = (capsule.tags || []).join(', ');
         document.getElementById('capsule-payload').value = capsule.payload || '';
         document.getElementById('capsule-modal').classList.add('active');
+        this.setupEditor();
     }
 
     hideModal() {
@@ -370,6 +425,58 @@ class CapsulesModule {
         } catch (error) {
             console.error('Failed to delete capsule:', error);
             app.showError('Failed to delete capsule');
+        }
+    }
+
+    async autoSave() {
+        const title = document.getElementById('capsule-title').value.trim();
+        const tags = document.getElementById('capsule-tags').value.trim().split(',').map(t => t.trim()).filter(Boolean);
+        const payload = document.getElementById('capsule-payload').value;
+        if (!title) return;
+        const capsule = {
+            id: title.replace(/\s+/g, '_') + '.json',
+            title,
+            tags,
+            payload,
+            lastModified: new Date().toISOString()
+        };
+        try {
+            await APIHelper.post(`/api/file/capsules/${capsule.id}`, { content: JSON.stringify(capsule, null, 2) });
+        } catch (error) {
+            console.error('Auto-save capsule failed:', error);
+        }
+    }
+
+    setupEditor() {
+        const contentEl = document.getElementById('capsule-payload');
+        this.undoStack = [contentEl.value];
+        this.redoStack = [];
+        contentEl.oninput = () => {
+            this.undoStack.push(contentEl.value);
+            if (this.undoStack.length > 1000) this.undoStack.shift();
+        };
+        contentEl.onkeydown = (e) => {
+            if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this.undo(); }
+            if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this.redo(); }
+        };
+        if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
+        this.autoSaveInterval = setInterval(() => this.autoSave(), 5000);
+    }
+
+    undo() {
+        if (this.undoStack.length > 1) {
+            const current = this.undoStack.pop();
+            this.redoStack.push(current);
+            const prev = this.undoStack[this.undoStack.length - 1];
+            document.getElementById('capsule-payload').value = prev;
+        }
+    }
+
+    redo() {
+        if (this.redoStack.length > 0) {
+            const value = this.redoStack.pop();
+            document.getElementById('capsule-payload').value = value;
+            this.undoStack.push(value);
         }
     }
 }
@@ -699,4 +806,76 @@ document.getElementById('habit-form').addEventListener('submit', (e) => {
 // Setup date change handler
 document.getElementById('planner-date').addEventListener('change', () => {
     plannerModule.loadDate();
+});
+
+// Global Search and Shortcuts
+let searchTimeout;
+
+function showSearchModal() {
+    const modal = document.getElementById('search-modal');
+    modal.classList.add('active');
+    const input = document.getElementById('search-input');
+    input.value = '';
+    document.getElementById('search-results').innerHTML = '';
+    input.focus();
+}
+
+function hideSearchModal() {
+    document.getElementById('search-modal').classList.remove('active');
+}
+
+async function performSearch(query) {
+    try {
+        const data = await APIHelper.get(`/api/search?q=${encodeURIComponent(query)}`);
+        const resultsEl = document.getElementById('search-results');
+        resultsEl.innerHTML = data.results.map(r => `<li><a href="#" onclick="openSearchResult('${r.path}')">${r.path}</a></li>`).join('');
+    } catch (err) {
+        console.error('Search failed', err);
+    }
+}
+
+function openSearchResult(pathStr) {
+    hideSearchModal();
+    const parts = pathStr.split('/');
+    const module = parts[0];
+    const file = parts.slice(1).join('/');
+    app.switchModule(module);
+    if (module === 'notes') {
+        notesModule.editNote(file);
+    } else if (module === 'capsules') {
+        capsulesModule.editCapsule(file);
+    } else if (module === 'planner') {
+        plannerModule.editTask(file.replace('.json',''));
+    }
+}
+
+document.getElementById('search-input')?.addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    const value = e.target.value.trim();
+    searchTimeout = setTimeout(() => {
+        if (value) performSearch(value);
+    }, 200);
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'n') {
+        e.preventDefault();
+        notesModule.showCreateModal();
+    }
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        showSearchModal();
+    }
+    if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        if (document.getElementById('note-modal').classList.contains('active')) notesModule.autoSave();
+        if (document.getElementById('capsule-modal').classList.contains('active')) capsulesModule.autoSave();
+    }
+    if (e.key === 'Escape') {
+        hideSearchModal();
+    }
+});
+
+document.getElementById('search-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'search-modal') hideSearchModal();
 });
