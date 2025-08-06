@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.6 - 2025-08-09
+### Added
+- Global search can include archived items via "Include Archived" toggle.
+
 ## 0.0.5 - 2025-08-09
 ### Added
 - In-memory Fuse.js search index with file system watching and query API.

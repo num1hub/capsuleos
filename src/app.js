@@ -935,6 +935,8 @@ function showSearchModal() {
     const input = document.getElementById('search-input');
     input.value = '';
     document.getElementById('search-results').innerHTML = '';
+    const includeArchived = document.getElementById('search-include-archived');
+    if (includeArchived) includeArchived.checked = false;
     input.focus();
 }
 
@@ -944,7 +946,9 @@ function hideSearchModal() {
 
 async function performSearch(query) {
     try {
-        const data = await searchIndex.query(query);
+        const includeArchived = document.getElementById('search-include-archived')?.checked;
+        const opts = includeArchived ? { includeArchived: '1' } : {};
+        const data = await searchIndex.query(query, opts);
         const resultsEl = document.getElementById('search-results');
         const resultsHtml = data.results.map(r => `<li><a href="#">${r.path}</a></li>`).join('');
         resultsEl.innerHTML = DOMPurify.sanitize(resultsHtml);

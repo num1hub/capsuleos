@@ -123,4 +123,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Upgrading
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes. Upgrades are data-compatible across versions; backup your `data/` folder and replace application files to move from 0.0.4 to 0.0.5.
+See [CHANGELOG.md](CHANGELOG.md) for release notes. Upgrades are data-compatible across versions; backup your `data/` folder and replace application files to move from 0.0.5 to 0.0.6.
