@@ -1,48 +1,25 @@
 {
   "name": "capsuleos",
-  "version": "0.0.6",
-  "description": "Local-first cognitive operating system for personal productivity",
+  "version": "0.0.1",
+  "description": "CapsuleOS Capsules-only local edition",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js",
-    "build": "node build.js",
-    "build-win": "node build.js",
-    "test": "jest"
-  },
-  "keywords": [
-    "productivity",
-    "notes",
-    "task-management",
-    "habit-tracker",
-    "local-first",
-    "electron",
-    "nodejs",
-    "express"
-  ],
-  "author": "CapsuleOS Project",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/num1hub/capsuleos.git"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "test": "jest",
+    "build": "node build.js"
   },
   "dependencies": {
-    "adm-zip": "^0.5.16",
-    "archiver": "^7.0.1",
-    "core-util-is": "^1.0.3",
-    "dompurify": "^3.0.6",
-    "express": "^4.18.2",
-    "fuse.js": "^7.1.0",
-    "multer": "^2.0.2"
+    "express": "^4.19.2",
+    "fuse.js": "^7.0.0",
+    "multer": "^1.4.5-lts.1",
+    "archiver": "^5.3.1",
+    "adm-zip": "^0.5.10",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "electron": "^37.2.5",
-    "electron-builder": "^26.0.12",
-    "jest": "^30.0.5",
-    "spectron": "^19.0.0",
-    "supertest": "^7.1.4"
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.0",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
   }
 }
