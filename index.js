@@ -1,282 +1,244 @@
-const express = require('express');
 const path = require('path');
 const fs = require('fs').promises;
-const archiver = require('archiver');
-const AdmZip = require('adm-zip');
+const express = require('express');
+const Fuse = require('fuse.js');
 const multer = require('multer');
-const { SearchIndexer } = require('./src/search/indexer');
+const Archiver = require('archiver');
+const AdmZip = require('adm-zip');
+const { v4: uuidv4 } = require('uuid');
+const { parseFilename, buildFilename } = require('./lib/version');
 
-const app = express();
-const PORT = process.env.PORT || 5000;
-const upload = multer({ dest: path.join(__dirname, 'tmp') });
+const DEFAULT_PORT = 5000;
+const DEFAULT_DATA_DIR = path.join(__dirname, 'data', 'capsules');
 
-// Middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static('src'));
-
-// Security headers
-app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    next();
-});
-
-// Logging middleware
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-    next();
-});
-
-// Data directory setup
-const dataPath = path.join(__dirname, 'data');
-const searchIndexer = new SearchIndexer(dataPath);
-
-async function initializeDataFolders() {
-    const folders = ['notes', 'capsules', 'planner', 'tracker', 'tracker/logs'];
-    
-    for (const folder of folders) {
-        const folderPath = path.join(dataPath, folder);
-        try {
-            await fs.access(folderPath);
-        } catch {
-            await fs.mkdir(folderPath, { recursive: true });
-            console.log(`Created folder: ${folderPath}`);
-        }
-    }
-
-    // Initialize habits.json if it doesn't exist
-    const habitsPath = path.join(dataPath, 'tracker/habits.json');
-    try {
-        await fs.access(habitsPath);
-    } catch {
-        await fs.writeFile(habitsPath, JSON.stringify({ habits: [] }, null, 2));
-    }
+function slugify(str) {
+  return str.replace(/[\\/]/g, '-').replace(/\s+/g, ' ').trim();
 }
 
-// API Routes
-function searchData(query, options = {}) {
-    return searchIndexer
-        .query(query, options)
-        .map(item => ({ path: item.itemId, version: item.version }));
+async function ensureDir(dir) {
+  await fs.mkdir(dir, { recursive: true });
 }
 
-app.get('/api/search', (req, res) => {
-    try {
-        const q = req.query.q || '';
-        const includeArchived = req.query.includeArchived === '1' || req.query.includeArchived === 'true';
-        const versions = req.query.versions || 'latest';
-        const results = q ? searchData(q, { includeArchived, versions }) : [];
-        res.json({ results });
-    } catch (error) {
-        console.error('Search error:', error);
-        res.status(500).json({ error: 'Search failed' });
-    }
-});
-app.get('/api/files/:folder', async (req, res) => {
-    try {
-        const folder = req.params.folder;
-        const fullPath = path.join(dataPath, folder);
-        const files = await fs.readdir(fullPath);
-        res.json(files);
-    } catch (error) {
-        console.error('List files error:', error);
-        res.json([]);
-    }
-});
+async function readCapsuleFiles(dir) {
+  const files = await fs.readdir(dir).catch(() => []);
+  const capsules = [];
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    const full = path.join(dir, file);
+    const data = JSON.parse(await fs.readFile(full, 'utf8'));
+    const parsed = parseFilename(file);
+    capsules.push({ file: full, base: parsed.base, version: parsed.version, data });
+  }
+  return capsules;
+}
 
-app.get('/api/file/:folder/:filename', async (req, res) => {
-    try {
-        const { folder, filename } = req.params;
-        const filePath = `${folder}/${filename}`;
-        const fullPath = path.join(dataPath, filePath);
-        const content = await fs.readFile(fullPath, 'utf8');
-        res.json({ content });
-    } catch (error) {
-        res.status(404).json({ error: `Failed to read file: ${error.message}` });
-    }
-});
+async function listLatestCapsules(dir) {
+  const all = await readCapsuleFiles(dir);
+  const map = {};
+  for (const c of all) {
+    const cur = map[c.base];
+    if (!cur || c.version > cur.version) map[c.base] = c;
+  }
+  return Object.values(map);
+}
 
-app.get('/api/file/:folder/:subfolder/:filename', async (req, res) => {
-    try {
-        const { folder, subfolder, filename } = req.params;
-        const filePath = `${folder}/${subfolder}/${filename}`;
-        const fullPath = path.join(dataPath, filePath);
-        const content = await fs.readFile(fullPath, 'utf8');
-        res.json({ content });
-    } catch (error) {
-        res.status(404).json({ error: `Failed to read file: ${error.message}` });
-    }
-});
+function createApp(dataDir) {
+  const app = express();
+  app.use(express.json());
+  app.use(express.static(path.join(__dirname, 'src')));
 
-app.post('/api/file/:folder/:filename', async (req, res) => {
-    try {
-        const { folder, filename } = req.params;
-        const { content } = req.body;
-        const filePath = `${folder}/${filename}`;
-        const fullPath = path.join(dataPath, filePath);
-        
-        // Ensure directory exists
-        const dir = path.dirname(fullPath);
-        await fs.mkdir(dir, { recursive: true });
-        
-        await fs.writeFile(fullPath, content, 'utf8');
-        if (searchIndexer) searchIndexer.addFile(fullPath);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: `Failed to write file: ${error.message}` });
-    }
-});
-
-app.post('/api/file/:folder/:subfolder/:filename', async (req, res) => {
-    try {
-        const { folder, subfolder, filename } = req.params;
-        const { content } = req.body;
-        const filePath = `${folder}/${subfolder}/${filename}`;
-        const fullPath = path.join(dataPath, filePath);
-        
-        // Ensure directory exists
-        const dir = path.dirname(fullPath);
-        await fs.mkdir(dir, { recursive: true });
-        
-        await fs.writeFile(fullPath, content, 'utf8');
-        if (searchIndexer) searchIndexer.addFile(fullPath);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: `Failed to write file: ${error.message}` });
-    }
-});
-
-app.delete('/api/file/:folder/:filename', async (req, res) => {
-    try {
-        const { folder, filename } = req.params;
-        const filePath = `${folder}/${filename}`;
-        const fullPath = path.join(dataPath, filePath);
-        await fs.unlink(fullPath);
-        if (searchIndexer) searchIndexer.removeFile(fullPath);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: `Failed to delete file: ${error.message}` });
-    }
-});
-
-app.delete('/api/file/:folder/:subfolder/:filename', async (req, res) => {
-    try {
-        const { folder, subfolder, filename } = req.params;
-        const filePath = `${folder}/${subfolder}/${filename}`;
-        const fullPath = path.join(dataPath, filePath);
-        await fs.unlink(fullPath);
-        if (searchIndexer) searchIndexer.removeFile(fullPath);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: `Failed to delete file: ${error.message}` });
-    }
-});
-
-// Export data as ZIP
-app.post('/api/export', async (req, res) => {
-    try {
-        res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', 'attachment; filename="data.zip"');
-        const archive = archiver('zip');
-        archive.on('error', err => {
-            throw err;
-        });
-        archive.pipe(res);
-        archive.directory(dataPath, false);
-        await archive.finalize();
-    } catch (error) {
-        console.error('Export error:', error);
-        res.status(500).json({ error: 'Export failed' });
-    }
-});
-
-// Import data from ZIP
-app.post('/api/import', upload.single('file'), async (req, res) => {
-    try {
-        const zip = new AdmZip(req.file.path);
-        const entries = zip.getEntries();
-        for (const entry of entries) {
-            if (entry.isDirectory) continue;
-            const entryPath = entry.entryName;
-            let destPath = path.join(dataPath, entryPath);
-            await fs.mkdir(path.dirname(destPath), { recursive: true });
-            // collision-safe merge
-            let counter = 1;
-            while (true) {
-                try {
-                    await fs.access(destPath);
-                    const parsed = path.parse(destPath);
-                    destPath = path.join(parsed.dir, `${parsed.name}_import${counter}${parsed.ext}`);
-                    counter++;
-                } catch {
-                    break;
-                }
-            }
-            await fs.writeFile(destPath, entry.getData());
-        }
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Import error:', error);
-        res.status(500).json({ error: 'Import failed' });
-    } finally {
-        if (req.file) {
-            await fs.unlink(req.file.path).catch(() => {});
-        }
-    }
-});
-
-// Serve main page
-app.get('/', (req, res) => {
+  app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'src', 'index.html'));
-});
+  });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-});
+  // list capsules
+  app.get('/api/capsules', async (req, res) => {
+    const latest = await listLatestCapsules(dataDir);
+    res.json(latest.filter(c => !c.data.archived).map(c => c.data));
+  });
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Not found' });
-});
+  // get capsule by id
+  app.get('/api/capsules/:id', async (req, res) => {
+    const all = await readCapsuleFiles(dataDir);
+    const matches = all.filter(c => c.data.id === req.params.id);
+    if (!matches.length) return res.status(404).json({ error: 'Not found' });
+    const latest = matches.reduce((a, b) => (b.version > a.version ? b : a));
+    res.json(latest.data);
+  });
 
-async function startServer() {
-    try {
-        await initializeDataFolders();
-        searchIndexer.buildIndex();
-
-        const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log(`CapsuleOS v0.0.6 Server running on http://0.0.0.0:${PORT}`);
-            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-        });
-
-        // Graceful shutdown
-        process.on('SIGTERM', () => {
-            console.log('SIGTERM received, shutting down gracefully');
-            server.close(() => {
-                console.log('Server closed');
-                process.exit(0);
-            });
-        });
-
-        process.on('SIGINT', () => {
-            console.log('SIGINT received, shutting down gracefully');
-            server.close(() => {
-                console.log('Server closed');
-                process.exit(0);
-            });
-        });
-
-    } catch (error) {
-        console.error('Failed to start server:', error);
-        process.exit(1);
+  // create or update
+  app.post('/api/capsules', async (req, res) => {
+    const { id, title, tags = [], payload = {}, archived = false } = req.body;
+    if (!title) return res.status(400).json({ error: 'title required' });
+    const all = await readCapsuleFiles(dataDir);
+    if (id) {
+      const matches = all.filter(c => c.data.id === id);
+      if (!matches.length) return res.status(404).json({ error: 'Not found' });
+      const latest = matches.reduce((a, b) => (b.version > a.version ? b : a));
+      const base = latest.base;
+      if (latest.version === 1 && path.basename(latest.file) === buildFilename(base, 1)) {
+        const v1name = path.join(dataDir, `${base}.v1.json`);
+        await fs.rename(latest.file, v1name);
+      }
+      const newVersion = latest.version + 1;
+      const newFile = path.join(dataDir, buildFilename(base, newVersion));
+      const newData = { id, title, tags, payload, archived };
+      await fs.writeFile(newFile, JSON.stringify(newData, null, 2));
+      res.json(newData);
+    } else {
+      const newId = uuidv4();
+      const base = slugify(title);
+      const file = path.join(dataDir, buildFilename(base, 1));
+      const data = { id: newId, title, tags, payload, archived };
+      await fs.writeFile(file, JSON.stringify(data, null, 2));
+      res.json(data);
     }
+  });
+
+  // delete
+  app.delete('/api/capsules/:id', async (req, res) => {
+    const all = await readCapsuleFiles(dataDir);
+    const matches = all.filter(c => c.data.id === req.params.id);
+    if (!matches.length) return res.status(404).json({ error: 'Not found' });
+    const base = matches[0].base;
+    const files = await fs.readdir(dataDir);
+    await Promise.all(
+      files.filter(f => f.startsWith(base)).map(f => fs.unlink(path.join(dataDir, f)))
+    );
+    res.json({ ok: true });
+  });
+
+  // search
+  app.get('/api/search', async (req, res) => {
+    const q = req.query.q || '';
+    const includeArchived = req.query.includeArchived === 'true';
+    const versions = req.query.versions === 'all';
+    let items = await readCapsuleFiles(dataDir);
+    if (!includeArchived) items = items.filter(c => !c.data.archived);
+    if (!versions) {
+      const map = {};
+      for (const c of items) {
+        const cur = map[c.base];
+        if (!cur || c.version > cur.version) map[c.base] = c;
+      }
+      items = Object.values(map);
+    }
+    const fuse = new Fuse(
+      items.map(c => ({ ...c.data, _version: c.version })),
+      { keys: ['title', 'tags', 'payload'], includeScore: true }
+    );
+    const results = fuse.search(q).map(r => ({
+      id: r.item.id,
+      title: r.item.title,
+      version: r.item._version,
+      archived: r.item.archived
+    }));
+    res.json({ results });
+  });
+
+  // versions
+  app.get('/api/versions/:base', async (req, res) => {
+    const files = await fs.readdir(dataDir);
+    const versions = files
+      .filter(f => parseFilename(f).base === req.params.base)
+      .map(f => parseFilename(f).version)
+      .sort((a, b) => a - b);
+    res.json({ versions });
+  });
+
+  // restore
+  app.post('/api/restore/:base', async (req, res) => {
+    const { version } = req.body;
+    let targetPath = path.join(dataDir, buildFilename(req.params.base, version));
+    try {
+      await fs.access(targetPath);
+    } catch {
+      if (version === 1) {
+        const alt = path.join(dataDir, `${req.params.base}.v1.json`);
+        try {
+          await fs.access(alt);
+          targetPath = alt;
+        } catch {
+          return res.status(404).json({ error: 'Version not found' });
+        }
+      } else {
+        return res.status(404).json({ error: 'Version not found' });
+      }
+    }
+
+    const data = await fs.readFile(targetPath, 'utf8');
+    const items = await fs.readdir(dataDir);
+    const next = Math.max(
+      ...items
+        .filter(f => parseFilename(f).base === req.params.base)
+        .map(f => parseFilename(f).version)
+    ) + 1;
+    const newFile = path.join(dataDir, buildFilename(req.params.base, next));
+    await fs.writeFile(newFile, data);
+    res.json({ ok: true, version: next });
+  });
+
+  // export
+  app.post('/api/export', async (req, res) => {
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="capsules_backup.zip"');
+    const archive = Archiver('zip');
+    archive.on('error', err => res.status(500).end(err.message));
+    archive.pipe(res);
+    archive.directory(path.join(__dirname, 'data/'), false);
+    archive.finalize();
+  });
+
+  // import
+  const upload = multer({ dest: path.join(__dirname, 'tmp') });
+  app.post('/api/import', upload.single('file'), async (req, res) => {
+    const zip = new AdmZip(req.file.path);
+    const entries = zip.getEntries();
+    for (const entry of entries) {
+      if (entry.isDirectory) continue;
+      const parsed = path.parse(entry.entryName);
+      let filename = parsed.base;
+      let dest = path.join(dataDir, filename);
+      let i = 1;
+      while (true) {
+        try {
+          await fs.access(dest);
+          filename = `${parsed.name}_import${i}${parsed.ext}`;
+          dest = path.join(dataDir, filename);
+          i++;
+        } catch {
+          break;
+        }
+      }
+      await fs.writeFile(dest, entry.getData());
+    }
+    await fs.unlink(req.file.path);
+    res.json({ ok: true });
+  });
+
+  return app;
 }
 
-if (require.main === module) {
-    startServer();
+async function startServer(port = DEFAULT_PORT, dataDir = DEFAULT_DATA_DIR) {
+  await ensureDir(dataDir);
+  const app = createApp(dataDir);
+  return app.listen(port, () => {
+    console.log(`CapsuleOS v0.0.1 running on port ${port}`);
+  });
 }
 
-module.exports = { app, startServer };
+if (require.main === module && !process.versions.electron) {
+  startServer();
+}
+
+// Electron integration
+if (process.versions.electron) {
+  const { app: electronApp, BrowserWindow } = require('electron');
+  electronApp.whenReady().then(async () => {
+    await startServer();
+    const win = new BrowserWindow({ width: 1000, height: 700 });
+    win.loadURL(`http://localhost:${DEFAULT_PORT}`);
+  });
+}
+
+module.exports = { createApp, startServer };

@@ -1,83 +1,24 @@
-# Contributing to CapsuleOS
+# Contributing
 
-Thank you for your interest in contributing to CapsuleOS!
+Thank you for considering contributing to CapsuleOS.
 
-## Development Setup
+## Development
+- Use Node.js 18 or later.
+- Install dependencies with `npm install`.
+- Run the server with `npm start`.
 
-1. **Prerequisites**
-   - Node.js 18+
-   - npm or yarn
+## Code Style
+- Use 2 spaces for indentation.
+- Prefer `const`/`let` and modern ES syntax.
+- Include semi-colons.
 
-2. **Setup**
-   ```bash
-   git clone https://github.com/num1hub/capsuleos.git
-   cd capsuleos
-   npm install
-   npm start
-   ```
+## Tests
+- Ensure `npm test` passes before submitting a pull request.
 
-## Project Structure
+## Process
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit your changes with clear messages.
+4. Open a pull request describing your changes.
 
-```
-src/
-├── index.html    # Main UI
-├── app.js       # Application logic  
-└── js/
-    └── api.js   # API helper
-```
-
-## Contributing Guidelines
-
-### Code Style
-- Use ES6+ features
-- Follow existing patterns
-- Add comments for complex logic
-- Handle errors gracefully
-
-### Pull Request Process
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/name`
-3. Make changes following code style
-4. Test your changes thoroughly
-5. Commit with clear messages
-6. Submit pull request
-
-### Issue Guidelines
-- Use issue templates
-- Provide clear descriptions
-- Include reproduction steps for bugs
-- Add screenshots if helpful
-
-## API Patterns
-
-All backend communication uses the APIHelper class:
-```javascript
-// Reading data
-const data = await APIHelper.get('/api/files/notes');
-
-// Writing data  
-await APIHelper.post('/api/file/notes/example.md', { content: 'Hello' });
-```
-
-## Module Development
-
-New modules should extend patterns from existing modules:
-1. Load data from API
-2. Render UI components
-3. Handle user interactions
-4. Save changes back to API
-
-## Documentation
-
-- Update README for significant changes
-- Add JSDoc comments for new functions
-- Include examples for new features
-
-## Testing
-
-- Test all functionality manually
-- Verify API endpoints work correctly
-- Check error handling edge cases
-- Ensure data persistence
-
-Thank you for contributing to CapsuleOS!
+The project is licensed under MIT.
