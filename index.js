@@ -58,14 +58,15 @@ async function initializeDataFolders() {
 function searchData(query, options = {}) {
     return searchIndexer
         .query(query, options)
-        .map(item => ({ path: item.itemId }));
+        .map(item => ({ path: item.itemId, version: item.version }));
 }
 
 app.get('/api/search', (req, res) => {
     try {
         const q = req.query.q || '';
         const includeArchived = req.query.includeArchived === '1' || req.query.includeArchived === 'true';
-        const results = q ? searchData(q, { includeArchived }) : [];
+        const versions = req.query.versions || 'latest';
+        const results = q ? searchData(q, { includeArchived, versions }) : [];
         res.json({ results });
     } catch (error) {
         console.error('Search error:', error);

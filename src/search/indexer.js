@@ -1,6 +1,7 @@
 const Fuse = require('fuse.js');
 const { readdirSync, readFileSync, statSync, watch, mkdirSync } = require('fs');
-const { join, extname, basename, relative } = require('path');
+const { join, extname, relative, dirname } = require('path');
+const { parseFilename } = require('../lib/version');
 
 function stripMd(text) {
   return text.replace(/[\#\*`>_\-\[\]\(\)!]/g, ' ');
@@ -28,10 +29,15 @@ class SearchIndexer {
 
   buildIndex() {
     this.items = [];
+    this.latest = {};
     const files = this.walk(this.root);
     for (const file of files) {
       const item = this.makeItem(file);
-      if (item) this.items.push(item);
+      if (item) {
+        this.items.push(item);
+        const lv = this.latest[item.basePath] || 0;
+        if (item.version > lv) this.latest[item.basePath] = item.version;
+      }
     }
     this.fuse.setCollection(this.items);
   }
@@ -57,11 +63,10 @@ class SearchIndexer {
     try {
       const relPath = relative(this.root, fullPath).split('\\').join('/');
       const module = relPath.split('/')[0] || '';
-      const ext = extname(fullPath);
-      const base = basename(fullPath, ext);
-      const versionMatch = base.match(/\.v(\d+)$/);
-      const version = versionMatch ? parseInt(versionMatch[1], 10) : 1;
-      const title = versionMatch ? base.replace(/\.v\d+$/, '') : base;
+      const { base, version, ext } = parseFilename(fullPath);
+      const title = base;
+      const dir = dirname(relPath);
+      const basePath = (dir ? dir + '/' : '') + `${base}${ext}`;
       let body = readFileSync(fullPath, 'utf8');
       let tags = [];
       if (ext === '.md') {
@@ -80,7 +85,8 @@ class SearchIndexer {
         body,
         tags,
         isArchived: relPath.startsWith('archive/'),
-        version
+        version,
+        basePath
       };
     } catch {
       return null;
@@ -92,12 +98,22 @@ class SearchIndexer {
     if (!item) return;
     const idx = this.items.findIndex(i => i.itemId === item.itemId);
     if (idx >= 0) this.items[idx] = item; else this.items.push(item);
+    const lv = this.latest[item.basePath] || 0;
+    if (item.version > lv) this.latest[item.basePath] = item.version;
     this.fuse.setCollection(this.items);
   }
 
   removeFile(fullPath) {
     const relPath = relative(this.root, fullPath).split('\\').join('/');
-    this.items = this.items.filter(i => i.itemId !== relPath);
+    let removed;
+    this.items = this.items.filter(i => {
+      if (i.itemId === relPath) { removed = i; return false; }
+      return true;
+    });
+    if (removed) {
+      const lv = Math.max(0, ...this.items.filter(i => i.basePath === removed.basePath).map(i => i.version));
+      if (lv === 0) delete this.latest[removed.basePath]; else this.latest[removed.basePath] = lv;
+    }
     this.fuse.setCollection(this.items);
   }
 
@@ -106,7 +122,11 @@ class SearchIndexer {
     return res
       .map(r => r.item)
       .filter(item => (opts.includeArchived || !item.isArchived))
-      .filter(item => (opts.versions === 'all' ? true : item.version === 1));
+      .filter(item => {
+        if (opts.versions === 'all') return true;
+        const lv = this.latest[item.basePath] || 1;
+        return item.version === lv;
+      });
   }
 
   watch() {
